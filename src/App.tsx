@@ -45,10 +45,35 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!supabase) { setBooting(false); return; }
-    supabase.auth.getSession().then(({ data }) => { setSession(data.session); setBooting(false); });
-    const { data } = supabase.auth.onAuthStateChange((_event, next) => setSession(next));
-    return () => data.subscription.unsubscribe();
+    if (!supabase) {
+      setError("Konfigurasi Supabase belum tersedia.");
+      setBooting(false);
+      return;
+    }
+
+    let mounted = true;
+    const { data } = supabase.auth.onAuthStateChange((_event, next) => {
+      if (mounted) setSession(next);
+    });
+
+    void (async () => {
+      try {
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        if (mounted) setSession(sessionData.session);
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : "Tidak dapat membaca sesi login.";
+        if (mounted) setError("Gagal menginisialisasi sesi Supabase: " + message);
+        console.error("Supabase session initialization failed:", cause);
+      } finally {
+        if (mounted) setBooting(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+      data.subscription.unsubscribe();
+    };
   }, []);
 
   const adminRequest = useCallback(async (payload: Record<string, unknown>) => {
