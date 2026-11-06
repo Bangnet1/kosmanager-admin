@@ -12,6 +12,25 @@
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
     <meta name="description" content="Panel administrasi Kos Manager." />
     <title>Kos Manager — Admin</title>
+    <style>
+      html,body{margin:0;min-height:100%;background:#0a1120;color:#dce8f2;font-family:Arial,sans-serif}
+      #boot-fallback{min-height:100vh;display:grid;place-content:center;text-align:center;padding:24px;box-sizing:border-box}
+      #boot-fallback h1{font-size:20px;margin:0 0 10px}
+      #boot-fallback p{max-width:440px;color:#9aabc0;font-size:13px;line-height:1.7;margin:0}
+      #boot-fallback .dot{width:22px;height:22px;border:2px solid #294052;border-top-color:#36d6c0;border-radius:50%;margin:0 auto 18px;animation:spin .8s linear infinite}
+      @keyframes spin{to{transform:rotate(360deg)}}
+    </style>
   </head>
-  <body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body>
+  <body>
+    <div id="root">
+      <div id="boot-fallback">
+        <div>
+          <div class="dot"></div>
+          <h1>Memuat Kos Manager Admin…</h1>
+          <p>Jika pesan ini tidak berubah, aplikasi JavaScript belum berhasil dimuat. Periksa koneksi atau buka ulang halaman setelah deployment selesai.</p>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>
