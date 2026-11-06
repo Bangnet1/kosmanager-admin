@@ -1,4 +1,4 @@
-const CACHE_NAME = "kos-manager-admin-shell-v1";
+const CACHE_NAME = "kos-manager-admin-shell-v2";
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -57,9 +57,29 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Cache only static app assets. Supabase REST, Auth, Storage and Functions
-  // requests have no static destination and are deliberately excluded.
-  if (["script", "style", "image", "font"].includes(request.destination)) {
+  // Always check the network first for executable code and styles so an
+  // installed PWA cannot remain stuck on an old cached application bundle.
+  // Fall back to cache only when offline. Images and fonts remain cache-first.
+  if (["script", "style"].includes(request.destination)) {
+    event.respondWith(
+      fetch(request)
+        .then(async (response) => {
+          if (response && response.ok && response.type === "basic") {
+            const copy = response.clone();
+            const cache = await caches.open(CACHE_NAME);
+            await cache.put(request, copy);
+          }
+          return response;
+        })
+        .catch(async () => {
+          const cached = await caches.match(request);
+          return cached || Response.error();
+        })
+    );
+    return;
+  }
+
+  if (["image", "font"].includes(request.destination)) {
     event.respondWith(
       caches.match(request).then((cached) => {
         if (cached) return cached;
