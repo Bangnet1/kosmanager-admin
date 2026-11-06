@@ -46,7 +46,7 @@ export default function App() {
   const loadUsers = useCallback(async () => {
     setBusy(true); setError("");
     try { const data = await adminRequest({ action: "list" }); setUsers(data.users || []); }
-    catch (e) { setError(e instanceof Error ? e.message : "Gagal memuat pelanggan."); }
+    catch (e) { const message = e instanceof Error ? e.message : "Gagal memuat pelanggan."; setError(message); if (message.includes("Admin access required") || message.includes("Invalid session")) { await supabase?.auth.signOut(); } }
     finally { setBusy(false); }
   }, [adminRequest]);
 
@@ -90,7 +90,7 @@ export default function App() {
   }
   async function toggle(user: Customer) {
     setBusy(true); setError("");
-    try { await adminRequest({ action: "set_status", user_id: user.id, is_active: !user.subscription?.is_active }); await loadUsers(); }
+    try { await adminRequest({ action: "set_status", user_id: user.id, is_active: !(user.subscription?.is_active && new Date(user.subscription.expires_at) > new Date()) }); await loadUsers(); }
     catch (e) { setError(e instanceof Error ? e.message : "Gagal mengubah status."); }
     finally { setBusy(false); }
   }
