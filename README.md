@@ -14,4 +14,4 @@ Panel admin terpisah untuk mengelola akun pelanggan dan masa aktif Kos Manager.
 
 ## Deploy
 GitHub Pages menggunakan workflow bawaan pada `.github/workflows/deploy.yml`.
-Setelah domain admin.bangnet.store diarahkan, tambahkan custom domain pada Settings → Pages.
+Setelah domain adkos.bangnet.store diarahkan, tambahkan custom domain pada Settings → Pages.
