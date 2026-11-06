@@ -90,8 +90,16 @@ export default function App() {
   }
   async function toggle(user: Customer) {
     setBusy(true); setError("");
-    try { await adminRequest({ action: "set_status", user_id: user.id, is_active: !(user.subscription?.is_active && new Date(user.subscription.expires_at) > new Date()) }); await loadUsers(); }
-    catch (e) { setError(e instanceof Error ? e.message : "Gagal mengubah status."); }
+    try {
+      const currentlyActive = Boolean(user.subscription?.is_active && new Date(user.subscription.expires_at) > new Date());
+      if (currentlyActive) {
+        await adminRequest({ action: "set_status", user_id: user.id, is_active: false });
+      } else {
+        // Activating an expired account grants a fresh 30-day term.
+        await adminRequest({ action: "update", user_id: user.id, days: 30, is_active: true });
+      }
+      await loadUsers();
+    } catch (e) { setError(e instanceof Error ? e.message : "Gagal mengubah status."); }
     finally { setBusy(false); }
   }
   async function remove(user: Customer) {
