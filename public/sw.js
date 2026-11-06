@@ -38,10 +38,11 @@ self.addEventListener("fetch", (event) => {
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request)
-        .then((response) => {
+        .then(async (response) => {
           if (response && response.ok) {
             const copy = response.clone();
-            event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put("/index.html", copy)));
+            const cache = await caches.open(CACHE_NAME);
+            await cache.put("/index.html", copy);
           }
           return response;
         })
@@ -62,10 +63,11 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       caches.match(request).then((cached) => {
         if (cached) return cached;
-        return fetch(request).then((response) => {
+        return fetch(request).then(async (response) => {
           if (response && response.ok && response.type === "basic") {
             const copy = response.clone();
-            event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)));
+            const cache = await caches.open(CACHE_NAME);
+            await cache.put(request, copy);
           }
           return response;
         });
