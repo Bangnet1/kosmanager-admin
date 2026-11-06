@@ -25,7 +25,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
       - name: Resolve dependencies and create package-lock.json
         run: npm install --package-lock-only --ignore-scripts --no-audit
       - name: Commit lockfile
