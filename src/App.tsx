@@ -33,14 +33,27 @@ export default function App() {
     if (!supabase) throw new Error("Konfigurasi Supabase belum tersedia.");
     const { data: { session: current } } = await supabase.auth.getSession();
     if (!current?.access_token) throw new Error("Sesi login berakhir. Silakan login kembali.");
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-users`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", apikey: import.meta.env.VITE_SUPABASE_ANON_KEY, Authorization: `Bearer ${current.access_token}` },
-      body: JSON.stringify(payload)
+
+    // Use the configured Supabase client so the correct project URL, publishable
+    // key, and current user JWT are always used on GitHub Pages/custom domains.
+    const { data, error } = await supabase.functions.invoke("admin-users", {
+      body: payload
     });
-    const body = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(body.error || "Permintaan admin gagal.");
-    return body;
+
+    if (error) {
+      let message = error.message || "Gagal menghubungi layanan admin.";
+      const context = (error as { context?: unknown }).context;
+      if (context instanceof Response) {
+        const details = await context.clone().json().catch(async () => {
+          const text = await context.clone().text().catch(() => "");
+          return { error: text || message };
+        });
+        message = details?.error || details?.message || message;
+      }
+      throw new Error(message);
+    }
+    if (data?.error) throw new Error(data.error);
+    return data;
   }, []);
 
   const loadUsers = useCallback(async () => {
