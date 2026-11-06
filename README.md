@@ -15,3 +15,9 @@ Panel admin terpisah untuk mengelola akun pelanggan dan masa aktif Kos Manager.
 ## Deploy
 GitHub Pages menggunakan workflow bawaan pada `.github/workflows/deploy.yml`.
 Setelah domain adkos.bangnet.store diarahkan, tambahkan custom domain pada Settings → Pages.
+
+## PWA
+Admin dashboard supports installation as a Progressive Web App (PWA).
+- Manifest: `/manifest.webmanifest`
+- Service worker: `/sw.js`
+- Static application shell only is cached; authenticated Supabase data is never cached.
