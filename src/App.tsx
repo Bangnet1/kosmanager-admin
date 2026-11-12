@@ -26,6 +26,8 @@ type Plan = {
   description: string;
   monthly_price: number;
   yearly_price: number;
+  monthly_days: number;
+  yearly_days: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -75,10 +77,10 @@ type AccessState = { key: "active" | "soon" | "expired" | "inactive"; label: str
 function accessState(subscription: Subscription): AccessState {
   if (!subscription) return { key: "inactive", label: "Belum aktif", days: null };
   const days = daysRemaining(subscription.expires_at);
-  if (days !== null && days < 0) return { key: "expired", label: "EXP", days };
-  if (!subscription.is_active) return { key: "inactive", label: "Nonaktif", days };
-  if (days !== null && days <= 3) return { key: "soon", label: "Segera habis · H-" + days, days };
-  return { key: "active", label: "Aktif", days };
+  if (days !== null && days < 0) return { key: "expired", label: "EXP · lewat " + Math.abs(days) + " hari", days };
+  if (!subscription.is_active) return { key: "inactive", label: "Nonaktif" + (days !== null ? " · sisa " + days + " hari" : ""), days };
+  if (days !== null && days <= 3) return { key: "soon", label: "Segera habis · H-" + days + " · sisa " + days + " hari", days };
+  return { key: "active", label: days === null ? "Aktif" : "Aktif · sisa " + days + " hari", days };
 }
 
 export default function App() {
@@ -102,7 +104,7 @@ export default function App() {
   const [durationForm, setDurationForm] = useState({ direction: "add", days: "30" });
   const [planModalOpen, setPlanModalOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
-  const [planForm, setPlanForm] = useState({ name: "", description: "", monthly_price: "", yearly_price: "" });
+  const [planForm, setPlanForm] = useState({ name: "", description: "", monthly_price: "", yearly_price: "", monthly_days: "30", yearly_days: "365" });
   const [financeModalOpen, setFinanceModalOpen] = useState(false);
   const [financeForm, setFinanceForm] = useState({
     direction: "income" as "income" | "expense",
@@ -260,7 +262,13 @@ export default function App() {
   }
   function openEdit(user: Customer) {
     setEditUser(user);
-    setForm({ email: user.email, password: "", plan_id: "", billing_cycle: "monthly", payment_status: "paid" });
+    setForm({
+      email: user.email,
+      password: "",
+      plan_id: user.subscription?.plan_id || "",
+      billing_cycle: user.subscription?.billing_cycle || "monthly",
+      payment_status: "paid"
+    });
     setFormOpen(true);
   }
   async function submitCustomer(event: FormEvent) {
@@ -273,6 +281,16 @@ export default function App() {
           action: "edit", user_id: editUser.id, email: form.email,
           ...(form.password ? { password: form.password } : {})
         });
+        const currentPlanId = editUser.subscription?.plan_id || "";
+        const currentCycle = editUser.subscription?.billing_cycle || "monthly";
+        if (form.plan_id && (form.plan_id !== currentPlanId || form.billing_cycle !== currentCycle)) {
+          await adminRequest({
+            action: "subscription_plan_update",
+            user_id: editUser.id,
+            plan_id: form.plan_id,
+            billing_cycle: form.billing_cycle
+          });
+        }
       } else {
         if (!form.plan_id) throw new Error("Pilih paket pelanggan terlebih dahulu. Buat paket melalui menu Paket bila daftar masih kosong.");
         if (form.password.length < 8) throw new Error("Password minimal 8 karakter.");
@@ -350,17 +368,25 @@ export default function App() {
     setEditingPlan(plan || null);
     setPlanForm(plan ? {
       name: plan.name, description: plan.description || "",
-      monthly_price: String(plan.monthly_price), yearly_price: String(plan.yearly_price)
-    } : { name: "", description: "", monthly_price: "", yearly_price: "" });
+      monthly_price: String(plan.monthly_price), yearly_price: String(plan.yearly_price),
+      monthly_days: String(plan.monthly_days || 30), yearly_days: String(plan.yearly_days || 365)
+    } : { name: "", description: "", monthly_price: "", yearly_price: "", monthly_days: "30", yearly_days: "365" });
     setPlanModalOpen(true);
   }
   async function submitPlan(event: FormEvent) {
     event.preventDefault();
     const monthly = Number(planForm.monthly_price);
     const yearly = Number(planForm.yearly_price);
+    const monthlyDays = Number(planForm.monthly_days);
+    const yearlyDays = Number(planForm.yearly_days);
     if (!planForm.name.trim()) { setError("Nama paket wajib diisi."); return; }
     if (!Number.isFinite(monthly) || monthly < 0 || !Number.isFinite(yearly) || yearly < 0) {
       setError("Harga paket harus berupa angka 0 atau lebih.");
+      return;
+    }
+    if (!Number.isInteger(monthlyDays) || monthlyDays < 1 || monthlyDays > 3650 ||
+        !Number.isInteger(yearlyDays) || yearlyDays < 1 || yearlyDays > 3650) {
+      setError("Durasi bulanan dan tahunan harus antara 1 sampai 3650 hari.");
       return;
     }
     setBusy(true);
@@ -369,7 +395,8 @@ export default function App() {
       await adminRequest({
         action: "plan_save", ...(editingPlan ? { id: editingPlan.id } : {}),
         name: planForm.name.trim(), description: planForm.description.trim(),
-        monthly_price: monthly, yearly_price: yearly, is_active: editingPlan?.is_active ?? true
+        monthly_price: monthly, yearly_price: yearly, monthly_days: monthlyDays, yearly_days: yearlyDays,
+        is_active: editingPlan?.is_active ?? true
       });
       setPlanModalOpen(false);
       await loadAll();
@@ -385,7 +412,9 @@ export default function App() {
     try {
       await adminRequest({
         action: "plan_save", id: plan.id, name: plan.name, description: plan.description || "",
-        monthly_price: plan.monthly_price, yearly_price: plan.yearly_price, is_active: !plan.is_active
+        monthly_price: plan.monthly_price, yearly_price: plan.yearly_price,
+        monthly_days: plan.monthly_days || 30, yearly_days: plan.yearly_days || 365,
+        is_active: !plan.is_active
       });
       await loadAll();
     } catch (cause) {
@@ -472,6 +501,10 @@ export default function App() {
   const packagePrice = currentPlan
     ? Number(form.billing_cycle === "monthly" ? currentPlan.monthly_price : currentPlan.yearly_price)
     : 0;
+  const packageDays = currentPlan
+    ? Number(form.billing_cycle === "monthly" ? currentPlan.monthly_days || 30 : currentPlan.yearly_days || 365)
+    : 0;
+  const monthlyChartRows = buildMonthlyFinance(finance);
 
   return (
     <div className="app-shell">
@@ -546,6 +579,11 @@ export default function App() {
               <Stat title="Laba / rugi bersih" value={money(totalIncome - totalExpense)} note="Pemasukan dikurangi pengeluaran" icon="＝"/>
               <Stat title="Transaksi tercatat" value={finance.length} note="Semua periode" icon="▤"/>
             </div>
+            <div className="finance-charts">
+              <FinanceLineChart title="Grafik pemasukan" subtitle="Total pemasukan per bulan" data={monthlyChartRows.map(row => ({ label: row.label, value: row.income }))} formatValue={money}/>
+              <FinanceLineChart title="Grafik pengeluaran" subtitle="Total pengeluaran per bulan" data={monthlyChartRows.map(row => ({ label: row.label, value: row.expense }))} formatValue={money}/>
+              <FinanceLineChart title="Grafik laba / rugi" subtitle="Pemasukan dikurangi pengeluaran per bulan" data={monthlyChartRows.map(row => ({ label: row.label, value: row.profit }))} formatValue={money} allowNegative/>
+            </div>
             <section className="panel">
               <div className="panel-head"><div><h3>Riwayat transaksi <span className="count">{finance.length}</span></h3><p>Pemasukan paket lunas tercatat otomatis; transaksi lain dapat ditambahkan manual.</p></div></div>
               <FinanceTable entries={finance} busy={busy} onDelete={deleteFinanceEntry}/>
@@ -579,17 +617,35 @@ export default function App() {
             {activePlans.length === 0 && <div className="alert inline-alert">Belum ada paket aktif. Buat paket terlebih dahulu melalui menu Paket.</div>}
             <label>Periode berlangganan
               <select value={form.billing_cycle} onChange={event => setForm({ ...form, billing_cycle: event.target.value as BillingCycle })}>
-                <option value="monthly">Bulanan · 30 hari</option><option value="yearly">Tahunan · 365 hari</option>
+                <option value="monthly">Bulanan · {currentPlan?.monthly_days || 30} hari</option>
+                <option value="yearly">Tahunan · {currentPlan?.yearly_days || 365} hari</option>
               </select>
             </label>
-            <div className="package-price-preview"><span>Harga paket dipilih</span><b>{currentPlan ? money(packagePrice) : "—"}</b><small>{form.billing_cycle === "monthly" ? "Tagihan per bulan" : "Tagihan per tahun"}</small></div>
+            <div className="package-price-preview"><span>Harga paket dipilih</span><b>{currentPlan ? money(packagePrice) : "—"}</b><small>{packageDays} hari masa aktif</small></div>
             <label>Status pembayaran
               <select value={form.payment_status} onChange={event => setForm({ ...form, payment_status: event.target.value })}>
                 <option value="paid">Lunas · catat sebagai pemasukan</option><option value="unpaid">Belum dibayar · tidak dicatat sebagai pemasukan</option>
               </select>
             </label>
           </>}
-          {editUser && <div className="modal-note">Perubahan email dan password akan diterapkan ke Supabase Auth. Untuk menambah atau mengurangi masa aktif, gunakan tombol Atur Masa Aktif pada daftar pelanggan.</div>}
+          {editUser && <>
+            <label>Paket pelanggan
+              <select value={form.plan_id} onChange={event => setForm({ ...form, plan_id: event.target.value })}>
+                <option value="">Tidak mengubah paket</option>
+                {plans.filter(plan => plan.is_active || plan.id === editUser.subscription?.plan_id).map(plan =>
+                  <option value={plan.id} key={plan.id}>{plan.name}{plan.is_active ? "" : " (paket saat ini · nonaktif)"}</option>
+                )}
+              </select>
+            </label>
+            <label>Periode paket
+              <select value={form.billing_cycle} onChange={event => setForm({ ...form, billing_cycle: event.target.value as BillingCycle })}>
+                <option value="monthly">Bulanan{currentPlan ? " · " + (currentPlan.monthly_days || 30) + " hari" : ""}</option>
+                <option value="yearly">Tahunan{currentPlan ? " · " + (currentPlan.yearly_days || 365) + " hari" : ""}</option>
+              </select>
+            </label>
+            {currentPlan && <div className="package-price-preview"><span>Paket baru yang dipilih</span><b>{money(packagePrice)}</b><small>{packageDays} hari · tanggal akhir tidak berubah</small></div>}
+            <div className="modal-note">Perubahan paket hanya memperbarui rincian paket, periode, dan harga langganan. Tanggal akhir masa aktif dan transaksi terdahulu tidak berubah. Gunakan tombol Atur Masa Aktif untuk menambah atau mengurangi hari.</div>
+          </>}
           {!editUser && <div className="modal-note">Akun pelanggan akan dibuat di Supabase Auth. Jika pembayaran dipilih Lunas, nominal paket akan otomatis dicatat pada Dashboard Keuangan.</div>}
           <div className="modal-actions"><button type="button" className="secondary" onClick={() => setFormOpen(false)}>Batal</button><button className="primary" disabled={busy || (!editUser && activePlans.length === 0)}>{busy ? "Menyimpan…" : "Simpan akun"}</button></div>
         </form>
@@ -617,7 +673,9 @@ export default function App() {
           <label>Rincian paket<textarea rows={3} value={planForm.description} onChange={event => setPlanForm({ ...planForm, description: event.target.value })} placeholder="Jelaskan fasilitas atau batas penggunaan paket…"/></label>
           <div className="form-grid">
             <label>Harga per bulan (Rp)<input type="number" min="0" step="1000" value={planForm.monthly_price} onChange={event => setPlanForm({ ...planForm, monthly_price: event.target.value })} placeholder="0" required/></label>
+            <label>Durasi bulanan (hari)<input type="number" min="1" max="3650" step="1" value={planForm.monthly_days} onChange={event => setPlanForm({ ...planForm, monthly_days: event.target.value })} placeholder="30" required/></label>
             <label>Harga per tahun (Rp)<input type="number" min="0" step="1000" value={planForm.yearly_price} onChange={event => setPlanForm({ ...planForm, yearly_price: event.target.value })} placeholder="0" required/></label>
+            <label>Durasi tahunan (hari)<input type="number" min="1" max="3650" step="1" value={planForm.yearly_days} onChange={event => setPlanForm({ ...planForm, yearly_days: event.target.value })} placeholder="365" required/></label>
           </div>
           <div className="modal-note">Paket yang dinonaktifkan tidak akan muncul saat menambahkan pelanggan baru. Riwayat pelanggan yang sudah memakai paket tetap tersimpan.</div>
           <div className="modal-actions"><button type="button" className="secondary" onClick={() => setPlanModalOpen(false)}>Batal</button><button className="primary" disabled={busy}>{busy ? "Menyimpan…" : "Simpan paket"}</button></div>
@@ -699,11 +757,77 @@ function PlanTable({ plans, busy, edit, toggle }: { plans: Plan[]; busy: boolean
     {plans.map(plan => <tr key={plan.id}>
       <td><b>{plan.name}</b><small>Dibuat {fmt(plan.created_at)}</small></td>
       <td className="plan-description">{plan.description || "—"}</td>
-      <td><b>{money(plan.monthly_price)}</b></td><td><b>{money(plan.yearly_price)}</b></td>
+      <td><b>{money(plan.monthly_price)}</b><small>{plan.monthly_days || 30} hari</small></td>
+      <td><b>{money(plan.yearly_price)}</b><small>{plan.yearly_days || 365} hari</small></td>
       <td><span className={"status " + (plan.is_active ? "active-status" : "off-status")}><i/>{plan.is_active ? "Aktif" : "Nonaktif"}</span></td>
       <td><div className="actions"><button disabled={busy} onClick={() => edit(plan)}>Edit</button><button disabled={busy} onClick={() => toggle(plan)}>{plan.is_active ? "Nonaktifkan" : "Aktifkan"}</button></div></td>
     </tr>)}
   </tbody></table></div></section>;
+}
+
+type FinanceChartPoint = { label: string; value: number };
+function buildMonthlyFinance(entries: FinanceEntry[]) {
+  const now = new Date();
+  return Array.from({ length: 6 }, (_, index) => {
+    const date = new Date(now.getFullYear(), now.getMonth() - (5 - index), 1);
+    const key = date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0");
+    const monthEntries = entries.filter(entry => entry.transaction_date?.slice(0, 7) === key);
+    const income = monthEntries.filter(entry => entry.direction === "income").reduce((sum, entry) => sum + Number(entry.amount), 0);
+    const expense = monthEntries.filter(entry => entry.direction === "expense").reduce((sum, entry) => sum + Number(entry.amount), 0);
+    return {
+      key,
+      label: new Intl.DateTimeFormat("id-ID", { month: "short" }).format(date),
+      income,
+      expense,
+      profit: income - expense
+    };
+  });
+}
+
+function FinanceLineChart({ title, subtitle, data, formatValue, allowNegative = false }: {
+  title: string; subtitle: string; data: FinanceChartPoint[];
+  formatValue: (value: number) => string; allowNegative?: boolean;
+}) {
+  const width = 620;
+  const height = 228;
+  const left = 22;
+  const right = 18;
+  const top = 18;
+  const bottom = 40;
+  const values = data.map(point => point.value);
+  let min = Math.min(0, ...values);
+  let max = Math.max(0, ...values);
+  if (!allowNegative) min = 0;
+  if (max === min) max = min + 1;
+  const padding = (max - min) * 0.14;
+  min -= allowNegative ? padding : 0;
+  max += padding;
+  const plotWidth = width - left - right;
+  const plotHeight = height - top - bottom;
+  const y = (value: number) => top + (max - value) / (max - min) * plotHeight;
+  const points = data.map((point, index) => ({
+    ...point,
+    x: left + (data.length <= 1 ? plotWidth / 2 : index * plotWidth / (data.length - 1)),
+    y: y(point.value)
+  }));
+  const polyline = points.map(point => point.x + "," + point.y).join(" ");
+  const grid = Array.from({ length: 4 }, (_, index) => min + (max - min) * index / 3);
+  return <section className="finance-chart panel">
+    <div className="finance-chart-head"><div><h3>{title}</h3><p>{subtitle}</p></div><span>6 bulan terakhir</span></div>
+    {data.every(point => point.value === 0) ? <div className="chart-empty">Belum ada transaksi pada periode grafik.</div> : <div className="chart-canvas">
+      <svg viewBox={"0 0 " + width + " " + height} role="img" aria-label={title + " enam bulan terakhir"}>
+        {grid.map((value, index) => <g key={index}>
+          <line x1={left} x2={width - right} y1={y(value)} y2={y(value)} className="chart-grid-line"/>
+          <text x={left + 2} y={y(value) - 5} className="chart-axis-label">{formatValue(value)}</text>
+        </g>)}
+        <polyline points={polyline} className="chart-line"/>
+        {points.map(point => <g key={point.label}>
+          <circle cx={point.x} cy={point.y} r="4" className="chart-point"/>
+          <text x={point.x} y={height - 13} textAnchor="middle" className="chart-month-label">{point.label}</text>
+        </g>)}
+      </svg>
+    </div>}
+  </section>;
 }
 
 function FinanceTable({ entries, busy, onDelete }: { entries: FinanceEntry[]; busy: boolean; onDelete: (entry: FinanceEntry) => void }) {
