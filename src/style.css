@@ -20,3 +20,46 @@
 .offline-banner b{font-size:11px;white-space:nowrap}
 .offline-banner span{font-size:10px;line-height:1.5;color:#e1c9a7}
 @media(max-width:760px){.install-button{font-size:0;padding:8px 10px}.install-button span{font-size:17px}.top-actions{gap:8px}.offline-status{font-size:0}.offline-status i{width:8px;height:8px;margin:0}.offline-banner{align-items:flex-start;flex-direction:column;gap:4px}}
+
+
+/* Subscription, package and finance dashboard */
+.stats-secondary{margin-top:-7px}
+.stat .red{color:#f18b8b}
+.stat strong{overflow-wrap:anywhere}
+.soon-status{background:#49391f;color:#ffd17f}
+.expired-status{background:#4a292e;color:#ff9c9c}
+.inactive-status{background:#293446;color:#a9b6c8}
+.inline-alert{margin:0 0 14px}
+.password-wrap{position:relative;display:flex;align-items:center}
+.password-wrap input{padding-right:84px!important}
+.password-toggle{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:1px solid var(--line);border-radius:5px;background:#1c3042;color:var(--teal);padding:5px 8px;font-size:9px;font-weight:700}
+.password-toggle:hover{background:#234354}
+.modal textarea{display:block;width:100%;margin-top:7px;padding:12px;border-radius:7px;background:#0c1727;border:1px solid #ffffff19;color:#edf3fa;outline:none;font:12px 'DM Sans',sans-serif;resize:vertical;line-height:1.55}
+.modal textarea:focus{border-color:#32cdbb;box-shadow:0 0 0 3px #30cbbb14}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-grid label{min-width:0}
+.package-price-preview{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 13px;border:1px solid #2c6963;background:#14323a;border-radius:8px;margin:14px 0;color:#9dd8d0}
+.package-price-preview span{font-size:10px}
+.package-price-preview b{font:800 16px Manrope;color:#75e7d5}
+.package-price-preview small{font-size:9px;color:#80aaa8}
+.duration-customer{padding:12px 13px;border:1px solid var(--line);border-radius:8px;background:#0d1929;margin:-7px 0 16px}
+.duration-customer b{display:block;color:#e6eef7;font-size:12px;overflow-wrap:anywhere}
+.duration-customer span{display:block;color:var(--muted);font-size:10px;margin-top:6px}
+.plan-summary{display:flex;align-items:center;gap:10px;padding:12px 15px;border:1px solid var(--line);background:#111b2b;border-radius:9px;margin:0 0 15px;color:#e2ebf4;font-size:11px}
+.plan-summary span{color:var(--muted);font-size:10px}
+.plan-description{max-width:260px;white-space:normal;line-height:1.5}
+.amount-income{color:#70deb0!important}
+.amount-expense{color:#ffab9f!important}
+.table-delete{border:1px solid #754349;border-radius:5px;background:#3a252e;color:#ffaaa8;padding:6px 9px;font-size:9px}
+.table-delete:hover{background:#4a2931}
+.muted-inline{font-size:10px;color:#78899f}
+@media(max-width:760px){
+  .sidebar{gap:6px;flex-wrap:nowrap}
+  .sidebar>.brand{flex:1;min-width:112px}
+  .sidebar>.nav{flex:0 0 auto;padding:8px 7px}
+  .sidebar>.nav span{width:auto}
+  .form-grid{grid-template-columns:1fr;gap:0}
+  .plan-summary{align-items:flex-start;flex-direction:column;gap:5px}
+  .stats-secondary{margin-top:-4px}
+  .package-price-preview{flex-wrap:wrap}
+}
