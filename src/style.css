@@ -88,3 +88,8 @@
  .chart-canvas{padding:0 4px}
  .chart-canvas svg{min-height:150px}
 }
+
+
+/* Package room quota field and plan catalogue */
+.plan-room-limit-field{grid-column:1/-1}
+.plan-room-limit-field small{display:block;margin-top:4px;color:var(--muted);font-size:10px;line-height:1.45}
