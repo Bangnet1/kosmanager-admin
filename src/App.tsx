@@ -28,6 +28,7 @@ type Plan = {
   yearly_price: number;
   monthly_days: number;
   yearly_days: number;
+  max_rooms: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -104,7 +105,7 @@ export default function App() {
   const [durationForm, setDurationForm] = useState({ direction: "add", days: "30" });
   const [planModalOpen, setPlanModalOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
-  const [planForm, setPlanForm] = useState({ name: "", description: "", monthly_price: "", yearly_price: "", monthly_days: "30", yearly_days: "365" });
+  const [planForm, setPlanForm] = useState({ name: "", description: "", monthly_price: "", yearly_price: "", monthly_days: "30", yearly_days: "365", max_rooms: "10" });
   const [financeModalOpen, setFinanceModalOpen] = useState(false);
   const [financeForm, setFinanceForm] = useState({
     direction: "income" as "income" | "expense",
@@ -369,8 +370,9 @@ export default function App() {
     setPlanForm(plan ? {
       name: plan.name, description: plan.description || "",
       monthly_price: String(plan.monthly_price), yearly_price: String(plan.yearly_price),
-      monthly_days: String(plan.monthly_days || 30), yearly_days: String(plan.yearly_days || 365)
-    } : { name: "", description: "", monthly_price: "", yearly_price: "", monthly_days: "30", yearly_days: "365" });
+      monthly_days: String(plan.monthly_days || 30), yearly_days: String(plan.yearly_days || 365),
+      max_rooms: String(plan.max_rooms || 10)
+    } : { name: "", description: "", monthly_price: "", yearly_price: "", monthly_days: "30", yearly_days: "365", max_rooms: "10" });
     setPlanModalOpen(true);
   }
   async function submitPlan(event: FormEvent) {
@@ -379,6 +381,7 @@ export default function App() {
     const yearly = Number(planForm.yearly_price);
     const monthlyDays = Number(planForm.monthly_days);
     const yearlyDays = Number(planForm.yearly_days);
+    const maxRooms = Number(planForm.max_rooms);
     if (!planForm.name.trim()) { setError("Nama paket wajib diisi."); return; }
     if (!Number.isFinite(monthly) || monthly < 0 || !Number.isFinite(yearly) || yearly < 0) {
       setError("Harga paket harus berupa angka 0 atau lebih.");
@@ -389,6 +392,10 @@ export default function App() {
       setError("Durasi bulanan dan tahunan harus antara 1 sampai 3650 hari.");
       return;
     }
+    if (!Number.isInteger(maxRooms) || maxRooms < 1 || maxRooms > 10000) {
+      setError("Batas kamar harus berupa angka bulat antara 1 sampai 10.000 kamar.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -396,6 +403,7 @@ export default function App() {
         action: "plan_save", ...(editingPlan ? { id: editingPlan.id } : {}),
         name: planForm.name.trim(), description: planForm.description.trim(),
         monthly_price: monthly, yearly_price: yearly, monthly_days: monthlyDays, yearly_days: yearlyDays,
+        max_rooms: maxRooms,
         is_active: editingPlan?.is_active ?? true
       });
       setPlanModalOpen(false);
@@ -414,6 +422,7 @@ export default function App() {
         action: "plan_save", id: plan.id, name: plan.name, description: plan.description || "",
         monthly_price: plan.monthly_price, yearly_price: plan.yearly_price,
         monthly_days: plan.monthly_days || 30, yearly_days: plan.yearly_days || 365,
+        max_rooms: plan.max_rooms || 10,
         is_active: !plan.is_active
       });
       await loadAll();
@@ -621,7 +630,7 @@ export default function App() {
                 <option value="yearly">Tahunan · {currentPlan?.yearly_days || 365} hari</option>
               </select>
             </label>
-            <div className="package-price-preview"><span>Harga paket dipilih</span><b>{currentPlan ? money(packagePrice) : "—"}</b><small>{packageDays} hari masa aktif</small></div>
+            <div className="package-price-preview"><span>Harga paket dipilih</span><b>{currentPlan ? money(packagePrice) : "—"}</b><small>{packageDays} hari masa aktif · Maksimal {currentPlan?.max_rooms || 10} kamar</small></div>
             <label>Status pembayaran
               <select value={form.payment_status} onChange={event => setForm({ ...form, payment_status: event.target.value })}>
                 <option value="paid">Lunas · catat sebagai pemasukan</option><option value="unpaid">Belum dibayar · tidak dicatat sebagai pemasukan</option>
@@ -676,6 +685,7 @@ export default function App() {
             <label>Durasi bulanan (hari)<input type="number" min="1" max="3650" step="1" value={planForm.monthly_days} onChange={event => setPlanForm({ ...planForm, monthly_days: event.target.value })} placeholder="30" required/></label>
             <label>Harga per tahun (Rp)<input type="number" min="0" step="1000" value={planForm.yearly_price} onChange={event => setPlanForm({ ...planForm, yearly_price: event.target.value })} placeholder="0" required/></label>
             <label>Durasi tahunan (hari)<input type="number" min="1" max="3650" step="1" value={planForm.yearly_days} onChange={event => setPlanForm({ ...planForm, yearly_days: event.target.value })} placeholder="365" required/></label>
+            <label className="plan-room-limit-field">Maksimal jumlah kamar<input type="number" min="1" max="10000" step="1" value={planForm.max_rooms} onChange={event => setPlanForm({ ...planForm, max_rooms: event.target.value })} placeholder="10" required/><small>Jumlah seluruh kamar yang boleh dibuat oleh satu pelanggan pada paket ini.</small></label>
           </div>
           <div className="modal-note">Paket yang dinonaktifkan tidak akan muncul saat menambahkan pelanggan baru. Riwayat pelanggan yang sudah memakai paket tetap tersimpan.</div>
           <div className="modal-actions"><button type="button" className="secondary" onClick={() => setPlanModalOpen(false)}>Batal</button><button className="primary" disabled={busy}>{busy ? "Menyimpan…" : "Simpan paket"}</button></div>
@@ -753,12 +763,13 @@ function CustomerTable({ users, plans, busy, adjust, toggle, edit, remove }: {
 
 function PlanTable({ plans, busy, edit, toggle }: { plans: Plan[]; busy: boolean; edit: (plan: Plan) => void; toggle: (plan: Plan) => void }) {
   if (!plans.length) return <section className="panel"><div className="empty"><span>▤</span><b>Belum ada paket layanan</b><p>Tambahkan paket beserta harga bulanan dan tahunan untuk digunakan saat membuat pelanggan.</p></div></section>;
-  return <section className="panel"><div className="table-wrap"><table><thead><tr><th>NAMA PAKET</th><th>RINCIAN</th><th>HARGA / BULAN</th><th>HARGA / TAHUN</th><th>STATUS</th><th className="right">TINDAKAN</th></tr></thead><tbody>
+  return <section className="panel"><div className="table-wrap"><table><thead><tr><th>NAMA PAKET</th><th>RINCIAN</th><th>HARGA / BULAN</th><th>HARGA / TAHUN</th><th>BATAS KAMAR</th><th>STATUS</th><th className="right">TINDAKAN</th></tr></thead><tbody>
     {plans.map(plan => <tr key={plan.id}>
       <td><b>{plan.name}</b><small>Dibuat {fmt(plan.created_at)}</small></td>
       <td className="plan-description">{plan.description || "—"}</td>
       <td><b>{money(plan.monthly_price)}</b><small>{plan.monthly_days || 30} hari</small></td>
       <td><b>{money(plan.yearly_price)}</b><small>{plan.yearly_days || 365} hari</small></td>
+      <td><b>{Number(plan.max_rooms || 10).toLocaleString("id-ID")} kamar</b><small>Maksimal unit kamar</small></td>
       <td><span className={"status " + (plan.is_active ? "active-status" : "off-status")}><i/>{plan.is_active ? "Aktif" : "Nonaktif"}</span></td>
       <td><div className="actions"><button disabled={busy} onClick={() => edit(plan)}>Edit</button><button disabled={busy} onClick={() => toggle(plan)}>{plan.is_active ? "Nonaktifkan" : "Aktifkan"}</button></div></td>
     </tr>)}
